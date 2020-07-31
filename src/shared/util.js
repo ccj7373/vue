@@ -65,9 +65,15 @@ export function isRegExp (v: any): boolean {
 
 /**
  * Check if val is a valid array index.
+ * 校验 val 是否是有效的素组索引
  */
 export function isValidArrayIndex (val: any): boolean {
+  // 转换成Float类型
   const n = parseFloat(String(val))
+  // 索引必须大于0
+  // 索引不能是小数  只有整数Math.floor向下取整后和原来的值相等
+  // 索引必须是数字
+  // isFinite() 函数用于检查其参数是否是无穷大。 如果 number 是 NaN（非数字），或者是正、负无穷大的数，则返回 false。
   return n >= 0 && Math.floor(n) === n && isFinite(val)
 }
 

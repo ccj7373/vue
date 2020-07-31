@@ -197,23 +197,37 @@ export function defineReactive (
  * Set a property on an object. Adds the new property and
  * triggers change notification if the property doesn't
  * already exist.
+ * 
+ * 设置一个对象(object)的属性(property)
+ * 当属性(property)不存在,新增属性(property)及手动的触发依赖通知
  */
 export function set (target: Array<any> | Object, key: any, val: any): any {
+
+  // 非空及基本类型(string,number,symbol,boolean)校验
   if (process.env.NODE_ENV !== 'production' &&
     (isUndef(target) || isPrimitive(target))
-  ) {
+  ) {Primitive(
     warn(`Cannot set reactive property on undefined, null, or primitive value: ${(target: any)}`)
   }
+  
+  // 校验target是否为数组及key是否为有效的索引
   if (Array.isArray(target) && isValidArrayIndex(key)) {
+    // 索引(key)大于素组长度时,扩张数组
     target.length = Math.max(target.length, key)
     target.splice(key, 1, val)
     return val
   }
+
+  // key属于target对象并且不是Object的原型对象(__proto__ ,constructor等)
   if (key in target && !(key in Object.prototype)) {
     target[key] = val
     return val
   }
+
+  // 获取target的__ob__(observer)
   const ob = (target: any).__ob__
+
+  // 校验target是否是vue实例及root $data
   if (target._isVue || (ob && ob.vmCount)) {
     process.env.NODE_ENV !== 'production' && warn(
       'Avoid adding reactive properties to a Vue instance or its root $data ' +
@@ -221,11 +235,16 @@ export function set (target: Array<any> | Object, key: any, val: any): any {
     )
     return val
   }
+  // 如果target已经绑定了__ob__(observer)则直接返回
   if (!ob) {
     target[key] = val
     return val
   }
+
+  // 把新添加的属性变成响应式对象
   defineReactive(ob.value, key, val)
+
+  // 手动的触发依赖通知
   ob.dep.notify()
   return val
 }

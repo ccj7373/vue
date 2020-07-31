@@ -35,6 +35,7 @@ const sharedPropertyDefinition = {
   set: noop
 }
 
+//依赖 Object.defineProperty 函数，通过该函数为对象的每个属性设置一对 getter/setter 从而得知属性被读取和被设置
 export function proxy (target: Object, sourceKey: string, key: string) {
   sharedPropertyDefinition.get = function proxyGetter () {
     return this[sourceKey][key]
@@ -45,17 +46,23 @@ export function proxy (target: Object, sourceKey: string, key: string) {
   Object.defineProperty(target, key, sharedPropertyDefinition)
 }
 
+// 初始化状态管理(双向绑定),在 Vue 的初始化阶段，_init 方法执行的时候，会执行 
 export function initState (vm: Component) {
   vm._watchers = []
+  // 获取opts
   const opts = vm.$options
+
   if (opts.props) initProps(vm, opts.props)
   if (opts.methods) initMethods(vm, opts.methods)
   if (opts.data) {
     initData(vm)
   } else {
+    // 如果data没有值时新增空对象并双向绑定,为了后续添加data时监控
     observe(vm._data = {}, true /* asRootData */)
   }
   if (opts.computed) initComputed(vm, opts.computed)
+
+  // opts.watch !== nativeWatch 火狐浏览器有个watch函数在Object对象的原型里,因此要区分
   if (opts.watch && opts.watch !== nativeWatch) {
     initWatch(vm, opts.watch)
   }
@@ -109,11 +116,26 @@ function initProps (vm: Component, propsOptions: Object) {
   toggleObserving(true)
 }
 
+// Data双向绑定
 function initData (vm: Component) {
   let data = vm.$options.data
+
+  // 获取data的数据
+  // vm.$options.data 其实最终被处理成了一个函数，且该函数的执行结果才是真正的数据。
+  // 依然存在一个使用 typeof 语句判断 data 数据类型的操作，
+  // 经过 mergeOptions 函数处理后 data 选项必然是一个函数，那么这里的判断还有必要吗？
+  // 这是因为 beforeCreate 生命周期钩子函数是在 mergeOptions 函数之后 initData 之前被调用的，
+  // 如果在 beforeCreate 生命周期钩子函数中修改了vm.$options.data 的值，
+  // 那么在 initData 函数中对于 vm.$options.data 类型的判断就是必要的了。
   data = vm._data = typeof data === 'function'
     ? getData(data, vm)
     : data || {}
+
+  // 判断data是否为纯对象
+  // 例
+  // data () {
+  //   return '我就是不返回对象'
+  // }
   if (!isPlainObject(data)) {
     data = {}
     process.env.NODE_ENV !== 'production' && warn(
@@ -123,12 +145,16 @@ function initData (vm: Component) {
     )
   }
   // proxy data on instance
+  // 代理数据实例
+
   const keys = Object.keys(data)
   const props = vm.$options.props
   const methods = vm.$options.methods
   let i = keys.length
   while (i--) {
     const key = keys[i]
+
+    // data中数据的key与methods重名
     if (process.env.NODE_ENV !== 'production') {
       if (methods && hasOwn(methods, key)) {
         warn(
@@ -137,6 +163,7 @@ function initData (vm: Component) {
         )
       }
     }
+    // data中数据的key与props重名
     if (props && hasOwn(props, key)) {
       process.env.NODE_ENV !== 'production' && warn(
         `The data property "${key}" is already declared as a prop. ` +
@@ -144,15 +171,24 @@ function initData (vm: Component) {
         vm
       )
     } else if (!isReserved(key)) {
+      // isReserved判断定义在 data 中的 key 是否是保留键,Vue 不会代理以 $ 或 _ 开头的字段
+
+      // 代理数据至_data
+      // 例
+      // Data数据为 message:"hello word"
+      // 访问修改(get,set)该对象时,实际访问的是vm.__data.message
       proxy(vm, `_data`, key)
     }
   }
   // observe data
+  // 为对象添加observer(__ob__)
   observe(data, true /* asRootData */)
 }
 
 export function getData (data: Function, vm: Component): any {
   // #7573 disable dep collection when invoking data getters
+  // 开头调用了 pushTarget() 函数，并且在 finally 语句块中调用了 popTarget()，
+  // 是为了防止使用 props 数据初始化 data 数据时收集冗余依赖
   pushTarget()
   try {
     return data.call(vm, vm)

@@ -17,6 +17,8 @@ export const isChrome = UA && /chrome\/\d+/.test(UA) && !isEdge
 export const isPhantomJS = UA && /phantomjs/.test(UA)
 
 // Firefox has a "watch" function on Object.prototype...
+// 火狐兼容
+// 火狐浏览器有个watch函数在Object对象的原型里,标注原生对象为nativeWatch
 export const nativeWatch = ({}).watch
 
 export let supportsPassive = false
