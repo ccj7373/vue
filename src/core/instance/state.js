@@ -145,8 +145,7 @@ function initData (vm: Component) {
     )
   }
   // proxy data on instance
-  // 代理数据实例
-
+  // 代理数据
   const keys = Object.keys(data)
   const props = vm.$options.props
   const methods = vm.$options.methods
@@ -172,7 +171,6 @@ function initData (vm: Component) {
       )
     } else if (!isReserved(key)) {
       // isReserved判断定义在 data 中的 key 是否是保留键,Vue 不会代理以 $ 或 _ 开头的字段
-
       // 代理数据至_data
       // 例
       // Data数据为 message:"hello word"
