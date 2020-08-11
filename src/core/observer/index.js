@@ -79,7 +79,7 @@ export class Observer {
    * Walk through all properties and convert them into
    * getter/setters. This method should only be called when
    * value type is Object.
-   * value的类型为Object时才被调用bianl3
+   * value的类型为Object时才被调用变量
    * 遍历所有属性,设置getter/setters(调用了 defineReactive 函数)
    */
   walk (obj: Object) {
@@ -192,18 +192,25 @@ export function defineReactive (
 
 
   // 当只传递两个参数时，说明没有传递第三个参数 val
+
+  // (!getter || setter)  也是说对象没有getter或存在setter时是就去深度观察
+  //  vue 早期版本判断为 
+  // if (!getter && arguments.length === 2)
+  // 即初始时存在getter时(用户定义的对象包含getter),vue不会去深度观察(条件不满足val=undefined)
+  // 但存在一个bug,当object存在自定义getter和setter时
+  // 由于该判断是不会深度观察的,但重新赋值的话可见新值被深度观测了,前后违背了定义响应式数据行为不一致
+  // 因此添加|| setter判断,只要setter存在就深度观察
   if ((!getter || setter) && arguments.length === 2) {
     // 根据 key 主动去对象上获取相应的值
     val = obj[key]
   }
 
   // val 本身有可能也是一个对象,递归继续调用 observe(val)深度观测
-  // shallow 为真时才会继续调用 observe 函数,shallow默认undefined,也就是默认深度观察
+  // shallow 为真时才会继续调用 observe 函数shallow默认undefined,也就是默认深度观察
   // Vue 实例对象上定义 $attrs 属性和 $listeners 属性时就是非深度观
   // defineReactive(vm, '$attrs', parentData && parentData.attrs || emptyObject, null, true) // 最后一个参数 shallow 为 true
   // defineReactive(vm, '$listeners', options._parentListeners || emptyObject, null, true)
   let childOb = !shallow && observe(val)
-
 
   // const data = {
   //   a: {
@@ -218,16 +225,19 @@ export function defineReactive (
   //   },
   //   __ob__: {value, dep, vmCount}
   // }
+  // a 闭包引用的 childOb 实际上就是 data.a.__ob__ 
+  // b 闭包引用的 childOb 实际上就是 undefined 
 
-  // a的dep=
 
-
+  //对于访问器属性的 get 和 set 函数是不会执行的，因为此时没有触发属性的读取和设置操作
   Object.defineProperty(obj, key, {
     enumerable: true,
     configurable: true,
     get: function reactiveGetter () {
 
+      // getter 常量中保存的属性原型的 get 函数
       // getter 存在那么直接调用该函数，并以该函数的返回值作为属性的值
+      // 如果 getter 不存在则使用 val 作为属性的值
       const value = getter ? getter.call(obj) : val
 
       // Dep.target 中保存的值就是要被收集的依赖(观察者)
@@ -242,10 +252,21 @@ export function defineReactive (
           }
         }
       }
+
+      // 为什么要将同样的依赖分别收集到这两个不同的”筐“里呢? 以上面例子的data对象为例子
+      // 第一个”筐“是 dep          dep ===data.__ob__ 
+      // 第二个”筐“是 childOb.dep  childOb === data.a.__ob__ 所以 childOb.dep === data.a.__ob__.dep
+
+      // 第一个”筐“里收集的依赖的触发时机是当属性值被修改时触发
+      // 第一个”筐“里收集的依赖的触发时机是当属性值被修改时触发
+      // 第二个”筐“里收集的依赖的触发时机是在使用 $set 或 Vue.set 给数据对象添加新属性时触发
       return value
     },
     set: function reactiveSetter (newVal) {
       const value = getter ? getter.call(obj) : val
+
+      // newVal !== newVal 说明新值与新值自身都不全等，同时旧值与旧值自身也不全等，大家想一下在 js 中什么时候会出现一个值与自身都不全等的？答案就是 NaN：
+      // NaN === NaN // false   
       /* eslint-disable no-self-compare */
       if (newVal === value || (newVal !== newVal && value !== value)) {
         return
@@ -255,13 +276,17 @@ export function defineReactive (
         customSetter()
       }
       // #7981: for accessor properties without setter
+      // bug修复防止只有getter没有setter的对象赋值
       if (getter && !setter) return
       if (setter) {
         setter.call(obj, newVal)
       } else {
         val = newVal
       }
+      // newVal的值可能是数组或是对象,所以要递归观察
       childOb = !shallow && observe(newVal)
+
+      // 依赖分发
       dep.notify()
     }
   })
