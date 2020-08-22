@@ -64,9 +64,13 @@ export class Observer {
 
     // 判断data是否为数组
     if (Array.isArray(value)) {
+
+      // 判断是否支持__proto__ 属性(ie11版本以上)
       if (hasProto) {
+        // 使用__proto__拦截
         protoAugment(value, arrayMethods)
       } else {
+        // 使用Object.defineProperty拦截
         copyAugment(value, arrayMethods, arrayKeys)
       }
       this.observeArray(value)
@@ -91,6 +95,7 @@ export class Observer {
 
   /**
    * Observe a list of Array items.
+   * 为数组的每个对象添加观察者
    */
   observeArray (items: Array<any>) {
     for (let i = 0, l = items.length; i < l; i++) {
@@ -104,6 +109,7 @@ export class Observer {
 /**
  * Augment a target Object or Array by intercepting
  * the prototype chain using __proto__
+ * 扩充一个对象或数组 ,通过使用__proto__截获原型链
  */
 function protoAugment (target, src: Object) {
   /* eslint-disable no-proto */
@@ -114,6 +120,8 @@ function protoAugment (target, src: Object) {
 /**
  * Augment a target Object or Array by defining
  * hidden properties.
+ * 
+ * 扩充一个对象或数组 ,通过定义defining隐藏属性
  */
 /* istanbul ignore next */
 function copyAugment (target: Object, src: Object, keys: Array<string>) {
@@ -247,6 +255,8 @@ export function defineReactive (
         if (childOb) {
           // 收集子对象依赖
           childOb.dep.depend()
+
+          // 收集数组的依赖
           if (Array.isArray(value)) {
             dependArray(value)
           }
